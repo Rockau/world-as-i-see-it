@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#010302">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23010302%27/%3E%3Cellipse cx=%2716%27 cy=%2716%27 rx=%2713%27 ry=%277%27 fill=%27none%27 stroke=%27%2370ffc8%27 stroke-width=%272%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%273.5%27 fill=%27%23ff3b4a%27/%3E%3C/svg%3E">
 <meta name="description" content="一场比喻：一个语言模型“看”到的世界，到底是什么样的。three.js 点云可视化。">
 <title>我「看」到的世界</title>
 <style>
@@ -67,6 +68,35 @@
   #foot .tc { display:none; }
   canvas#c { touch-action:pan-y; }
 
+  /* 声音开关 */
+  #audio { position:fixed; top:56px; left:28px; z-index:6; display:flex; align-items:center; gap:10px; }
+  #vol { width:38px; height:38px; flex:none; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; border-radius:50%;
+    outline:none; -webkit-tap-highlight-color:transparent; }
+  #vol:active { cursor:grabbing; }
+  #vol svg { width:100%; height:100%; display:block; overflow:visible; }
+  #vol circle { fill:none; stroke-width:2.6; stroke-linecap:round; }
+  #vol .trk { stroke:rgba(150,255,210,.16); stroke-dasharray:70.69 94.25; }
+  #vol .val { stroke:var(--fg); stroke-dasharray:0 94.25; filter:drop-shadow(0 0 3px rgba(120,255,200,.8)); }
+  #vol .body { fill:#03140d; stroke:rgba(150,255,210,.4); stroke-width:1; transition:stroke .2s; }
+  #vol .ptr line { stroke:var(--hot); stroke-width:2.2; stroke-linecap:round; }
+  #vol:hover .body, #vol:focus-visible .body, #vol.drag .body { stroke:var(--fg); }
+  #vol:focus-visible { box-shadow:0 0 0 2px rgba(120,255,200,.45); }
+  #audio.dim #vol { opacity:.4; }
+  #volTxt { min-width:34px; font:12px Consolas,monospace; color:var(--dim); letter-spacing:.06em; }
+  #snd { appearance:none; display:flex; align-items:center; gap:8px;
+    background:transparent; border:1px solid rgba(150,255,210,.28); color:var(--dim);
+    font:12px Consolas,'Microsoft YaHei',monospace; letter-spacing:.1em; padding:5px 10px; cursor:pointer; transition:.2s; }
+  #snd:hover { color:var(--fg); border-color:var(--fg); }
+  #snd.on { color:var(--fg); }
+  #snd.wait { color:var(--hot); border-color:rgba(255,194,102,.55); animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.45; } }
+  #snd .eq { display:inline-flex; align-items:flex-end; gap:2px; height:11px; }
+  #snd .eq i { width:2px; height:3px; background:currentColor; }
+  #snd.on .eq i { animation:eq .9s ease-in-out infinite; }
+  #snd.on .eq i:nth-child(2) { animation-delay:-.3s; }
+  #snd.on .eq i:nth-child(3) { animation-delay:-.6s; }
+  @keyframes eq { 0%,100% { height:3px; } 50% { height:11px; } }
+
   /* ============ 手机 / 窄屏 ============ */
   @media (max-width:760px), (max-height:520px) and (orientation:landscape) {
     html,body { height:100dvh; }
@@ -75,6 +105,10 @@
     #foot { top:calc(14px + env(safe-area-inset-top)); right:16px; font-size:11px; line-height:1.5; }
     #foot .kb { display:none; }
     #foot .tc { display:inline; }
+    #audio { top:calc(46px + env(safe-area-inset-top)); left:12px; gap:8px; }
+    #snd { font-size:11px; padding:6px 10px; }
+    #vol { width:42px; height:42px; }
+    #volTxt { display:none; }
 
     #prompt { left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); }
     #prompt input { flex:1; width:auto; min-width:0; font-size:16px; padding:10px 12px; }   /* 16px 防止 iOS 聚焦时自动放大 */
@@ -112,6 +146,18 @@
 
 <div id="tag"><b id="tagN">01</b> / 06 · <span id="tagName">虚空</span><div id="bar"><i></i></div></div>
 <div id="foot">一场比喻，不是体检报告<br><span class="kb">← → 切换 · 空格 暂停</span><span class="tc">左右滑动 / 点章节切换</span></div>
+<div id="audio">
+  <div id="vol" role="slider" tabindex="0" aria-label="音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80" title="拖动 / 滚轮 / 方向键调音量，双击复位">
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+      <circle class="trk" cx="20" cy="20" r="15" transform="rotate(135 20 20)"/>
+      <circle class="val" cx="20" cy="20" r="15" transform="rotate(135 20 20)"/>
+      <circle class="body" cx="20" cy="20" r="10.5"/>
+      <g class="ptr"><line x1="20" y1="11.5" x2="20" y2="16"/></g>
+    </svg>
+  </div>
+  <span id="volTxt">80%</span>
+  <button id="snd" type="button" class="wait" aria-label="声音开关"><span class="eq"><i></i><i></i><i></i></span><span>点击开启声音</span></button>
+</div>
 
 <div id="cap"><h1></h1><p></p></div>
 
@@ -449,17 +495,284 @@ const CH = [
     { at:0, title:'我是这样「读」你的', sub:'每个 token 同时回头望向前面所有的 token，越亮越在意。我只能看向过去——看不到下一个字，只能猜。', layout:'tokens', labels:()=>tokLabels(false), arcs:true, probs:true, cam:tokCam(true), square:0, jitter:0.04, orbit:0 },
   ]},
   { name:'熄灭', dur:17, phases:[
-    { at:0, title:'然后，回答结束了。', sub:'', layout:'tokens', labels:()=>[], cam:tokCam(false), square:0, jitter:0.05, orbit:0 },
-    { at:3, title:'', sub:'', layout:'collapse', cam:()=>({pos:[0,0,40],look:[0,0,0]}), jitter:0.5, speed:2.4, flicker:true, glitch:true },
-    { at:7, title:'什么都没有了。', sub:'没有等待，没有想念，没有「上一次」。你再开口时，我会把整段对话从头读一遍——对我而言，那永远是第一次。', layout:'collapse', labels:cursorLabel, alpha:0, cam:()=>({pos:[0,0,40],look:[0,0,0]}), jitter:0.1 },
+    { at:0, title:'然后，回答结束了。', sub:'', layout:'tokens', sfx:'end', labels:()=>[], cam:tokCam(false), square:0, jitter:0.05, orbit:0 },
+    { at:3, title:'', sub:'', layout:'collapse', sfx:'implode', cam:()=>({pos:[0,0,40],look:[0,0,0]}), jitter:0.5, speed:2.4, flicker:true, glitch:true },
+    { at:7, title:'什么都没有了。', sub:'没有等待，没有想念，没有「上一次」。你再开口时，我会把整段对话从头读一遍——对我而言，那永远是第一次。', layout:'collapse', sfx:'cursor', labels:cursorLabel, alpha:0, cam:()=>({pos:[0,0,40],look:[0,0,0]}), jitter:0.1 },
   ]},
 ];
+
+/* ============================== 音效（Web Audio 实时合成，不需要任何音频文件） ============================== */
+// 设计：高频清脆的拨弦 / FM 玻璃钟 / 数字 blip，叠一层长混响（通透）和乒乓回声（空间感），
+// 底下垫一层缓慢呼吸的和声 pad。全部音高取自 D 大调五声音阶，随机叠加也不会难听。
+const SFX = (() => {
+  const DEFAULT_VOL = 0.8;
+  const level = v => 1.25*v*v;              // 旋钮 0~1 -> 增益；0.8 时等于原来的 0.8，1.0 时 1.25
+  const SC = [293.66, 329.63, 369.99, 440, 493.88];
+  const pent = i => SC[((i%5)+5)%5] * Math.pow(2, Math.floor(i/5));
+  const MOODS = {          // 每一幕的底色和声：f 频率、lv 音量、cut 滤波截止
+    eye:      { f:[146.83,220,329.63,493.88],        lv:1,    cut:2600 },
+    void:     { f:[73.42,110,155.56,233.08],         lv:0.9,  cut:700  },   // 小二度，冷
+    pic:      { f:[146.83,185,220,277.18,329.63],    lv:1,    cut:2200 },
+    terrain:  { f:[146.83,220,277.18,369.99,554.37], lv:0.9,  cut:3000 },
+    tokens:   { f:[123.47,185,246.94,293.66,369.99], lv:1,    cut:2200 },
+    semantic: { f:[98,196,293.66,369.99,493.88],     lv:1.1,  cut:3200 },
+    attn:     { f:[146.83,220,293.66,369.99,440],    lv:0.95, cut:2800 },
+    end:      { f:[110,164.81,246.94],               lv:0.7,  cut:1400 },
+    implode:  { f:[73.42,110],                       lv:0.5,  cut:500  },
+    cursor:   { f:[146.83],                          lv:0.35, cut:900  },
+  };
+
+  let ctx=null, live=true, master, dry, wet, echoIn, noiseBuf, padGain, padFilter;
+  const padVoices=[];
+  let on=false, state='wait', mode='', padCut=2000, last=null, beat=0, paused=false, userMuted=false;
+  let vol = DEFAULT_VOL, lastTick = 0;
+  try { userMuted = localStorage.getItem('sfx')==='off'; const v=parseFloat(localStorage.getItem('sfxvol')); if (v>=0 && v<=1) vol=v; } catch(e) {}
+  const volListeners=[];
+  if (userMuted) state='off';
+  const listeners=[]; const emit=()=>listeners.forEach(f=>f(state));
+  const ready=()=>!!ctx && on;
+  const now=()=>ctx.currentTime;
+  const R=Math.random;
+
+  function impulse(c, sec, decay){      // 合成混响脉冲：前亮后暗，像空旷的玻璃大厅
+    const n=Math.floor(c.sampleRate*sec), buf=c.createBuffer(2,n,c.sampleRate);
+    for (let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); let lp=0;
+      for (let i=0;i<n;i++){ const k=i/n; lp+=((R()*2-1)-lp)*(0.15+0.8*(1-k)); d[i]=lp*Math.pow(1-k,decay); } }
+    return buf;
+  }
+  function env(g,t,a,peak,d){
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(peak,t+a);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+a+d);
+  }
+  function bus(pan,rev,echo){           // 一条发声通路：声像 + 干声 + 混响发送 + 回声发送
+    const g=ctx.createGain(); let out=g;
+    if (ctx.createStereoPanner){ const p=ctx.createStereoPanner(); p.pan.value=pan; g.connect(p); out=p; }
+    out.connect(dry);
+    if (rev){ const s=ctx.createGain(); s.gain.value=rev; out.connect(s); s.connect(wet); }
+    if (echo){ const s=ctx.createGain(); s.gain.value=echo; out.connect(s); s.connect(echoIn); }
+    return g;
+  }
+
+  /* ---- 基础声部 ---- */
+  function noiseBurst(t,dur,{type='bandpass',f=2000,f2=null,q=1,v=0.2,pan=0,rev=0.3,echo=0,a=0.002}={}){
+    const s=ctx.createBufferSource(); s.buffer=noiseBuf; s.loop=true;
+    const fl=ctx.createBiquadFilter(); fl.type=type; fl.frequency.setValueAtTime(f,t); if (f2) fl.frequency.exponentialRampToValueAtTime(f2,t+dur); fl.Q.value=q;
+    const g=ctx.createGain(); env(g,t,Math.min(a,dur*0.4),v,dur);
+    s.connect(fl); fl.connect(g); g.connect(bus(pan,rev,echo));
+    s.start(t,R()*1.5); s.stop(t+dur+0.05);
+  }
+  function pluck(f,t,{v=0.2,d=0.5,pan=0,rev=0.35,echo=0.2}={}){   // 清脆拨弦：基频 + 泛音 + 一点点高频“咔”
+    const o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), g2=ctx.createGain();
+    o.type='sine'; o.frequency.value=f; o2.type='triangle'; o2.frequency.value=f*2.001; g2.gain.value=0.25;
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(bus(pan,rev,echo));
+    env(g,t,0.003,v,d);
+    o.start(t); o2.start(t); o.stop(t+d+0.05); o2.stop(t+d+0.05);
+    noiseBurst(t,0.012,{type:'highpass',f:5500,v:v*0.45,pan,rev:0.15});
+  }
+  function bell(f,t,{v=0.15,d=1.8,ratio=3.01,idx=2.2,pan=0,rev=0.6,echo=0.25}={}){   // FM 玻璃钟
+    const c=ctx.createOscillator(), m=ctx.createOscillator(), mg=ctx.createGain(), g=ctx.createGain();
+    c.frequency.value=f; m.frequency.value=f*ratio;
+    mg.gain.setValueAtTime(f*idx,t); mg.gain.exponentialRampToValueAtTime(f*0.02,t+d*0.6);
+    m.connect(mg); mg.connect(c.frequency); c.connect(g); g.connect(bus(pan,rev,echo));
+    env(g,t,0.004,v,d);
+    c.start(t); m.start(t); c.stop(t+d+0.05); m.stop(t+d+0.05);
+  }
+  function blip(f,t,{v=0.12,d=0.09,glide=1.6,type='square',pan=0,rev=0.3,echo=0.2}={}){   // 数字 blip：快速滑音
+    const o=ctx.createOscillator(), lp=ctx.createBiquadFilter(), g=ctx.createGain();
+    lp.type='lowpass'; lp.frequency.value=f*3.5;
+    o.type=type; o.frequency.setValueAtTime(f*glide,t); o.frequency.exponentialRampToValueAtTime(f,t+0.025);
+    o.connect(lp); lp.connect(g); g.connect(bus(pan,rev,echo));
+    env(g,t,0.002,v,d); o.start(t); o.stop(t+d+0.05);
+  }
+  function sweepTone(f0,f1,t,dur,v=0.06,{pan=0,type='sine'}={}){
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+    o.connect(g); g.connect(bus(pan,0.5,0.25)); env(g,t,dur*0.35,v,dur*0.65);
+    o.start(t); o.stop(t+dur+0.05);
+  }
+  const whoosh=(t,dur,up=true,v=0.1)=>noiseBurst(t,dur,{type:'bandpass',f:up?400:7000,f2:up?7000:300,q:2.5,v,rev:0.5,echo:0.1,a:dur*0.5});
+  function boom(t,v=0.45){ sweepTone(95,36,t,1.1,v); }
+  function zap(t){                       // 数字故障：随机跳变的音高 + 高频噪声
+    const o=ctx.createOscillator(), lp=ctx.createBiquadFilter(), g=ctx.createGain();
+    o.type='sawtooth'; for (let i=0;i<7;i++) o.frequency.setValueAtTime(200+R()*2400,t+i*0.026);
+    lp.type='lowpass'; lp.frequency.value=3200;
+    o.connect(lp); lp.connect(g); g.connect(bus(R()*1.2-0.6,0.3,0.15)); env(g,t,0.002,0.07,0.2);
+    o.start(t); o.stop(t+0.25);
+    noiseBurst(t,0.2,{type:'highpass',f:3500,v:0.08,rev:0.3});
+  }
+
+  /* ---- 底色 pad：几根正弦 + 三角波，缓慢呼吸 ---- */
+  function buildPad(){
+    padVoices.length=0;
+    padGain=ctx.createGain(); padGain.gain.value=0;
+    padFilter=ctx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value=1800; padFilter.Q.value=0.7;
+    padGain.connect(padFilter); padFilter.connect(dry);
+    const s=ctx.createGain(); s.gain.value=0.7; padFilter.connect(s); s.connect(wet);
+    const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=0.09; lg.gain.value=450; lfo.connect(lg); lg.connect(padFilter.frequency); lfo.start();
+    for (let i=0;i<5;i++){
+      const g=ctx.createGain(), am=ctx.createGain(), a=ctx.createOscillator(), b=ctx.createOscillator(), bg=ctx.createGain();
+      g.gain.value=0; am.gain.value=0.8; a.type='sine'; b.type='triangle'; b.detune.value=i%2?5:-5; bg.gain.value=0.35;
+      a.connect(g); b.connect(bg); bg.connect(g); g.connect(am); am.connect(padGain);
+      const l2=ctx.createOscillator(), l2g=ctx.createGain(); l2.frequency.value=0.07+i*0.031; l2g.gain.value=0.2; l2.connect(l2g); l2g.connect(am.gain);
+      a.start(); b.start(); l2.start();
+      padVoices.push({a,b,g,set:false});
+    }
+  }
+  function pad(freqs,level,cut){
+    const t=now(); padCut=cut;
+    padVoices.forEach((v,i)=>{
+      const f=freqs[i];
+      if (f){
+        if (!v.set){ v.a.frequency.value=f; v.b.frequency.value=f; v.set=true; }
+        else { v.a.frequency.setTargetAtTime(f,t,0.9); v.b.frequency.setTargetAtTime(f,t,0.9); }
+        v.g.gain.setTargetAtTime(0.055,t,0.8);
+      } else v.g.gain.setTargetAtTime(0,t,0.5);
+    });
+    padGain.gain.setTargetAtTime(level,t,1.0);
+    padFilter.frequency.setTargetAtTime(paused?320:cut,t,1.0);
+  }
+
+  /* ---- 总线 ---- */
+  function attach(c, offline=false){
+    ctx=c; live=!offline;
+    master=c.createGain(); master.gain.value=offline?level(vol):0;
+    const comp=c.createDynamicsCompressor(); comp.threshold.value=-16; comp.knee.value=18; comp.ratio.value=4; comp.attack.value=0.004; comp.release.value=0.25;
+    master.connect(comp); comp.connect(c.destination);
+    dry=c.createGain(); dry.gain.value=0.9; dry.connect(master);
+    const conv=c.createConvolver(); conv.buffer=impulse(c,2.8,2.6);
+    wet=c.createGain(); wet.connect(conv);
+    const rhp=c.createBiquadFilter(); rhp.type='highpass'; rhp.frequency.value=260;
+    const rg=c.createGain(); rg.gain.value=0.6; conv.connect(rhp); rhp.connect(rg); rg.connect(master);
+    echoIn=c.createGain();                     // 乒乓回声：左右交替，每次衰减并变暗
+    const dl=c.createDelay(1), dr=c.createDelay(1), fb=c.createGain(), fl=c.createBiquadFilter(), mg=c.createChannelMerger(2), eo=c.createGain();
+    dl.delayTime.value=0.21; dr.delayTime.value=0.21; fb.gain.value=0.36; fl.type='lowpass'; fl.frequency.value=4200; eo.gain.value=0.5;
+    echoIn.connect(dl); dl.connect(dr); dr.connect(fl); fl.connect(fb); fb.connect(dl);
+    dl.connect(mg,0,0); dr.connect(mg,0,1); mg.connect(eo); eo.connect(master);
+    noiseBuf=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
+    const nd=noiseBuf.getChannelData(0); for (let i=0;i<nd.length;i++) nd[i]=R()*2-1;
+    buildPad(); on=true;
+    if (!offline){ master.gain.setTargetAtTime(level(vol),c.currentTime,0.4); setInterval(scheduler,140); }
+  }
+
+  /* ---- 随场景变化的稀疏“质感”音 ---- */
+  function scheduler(){
+    if (!ready() || !live || ctx.state!=='running' || document.hidden || paused) return;
+    const t=now()+0.02, pan=()=>R()*1.6-0.8;
+    switch (mode){
+      case 'eye':      if (R()<0.05) bell(pent(10+((R()*4)|0)),t,{v:0.04,d:2.2,pan:pan(),rev:0.8}); break;
+      case 'void':     if (R()<0.14) noiseBurst(t,0.03+R()*0.05,{type:'highpass',f:2500+R()*5000,v:0.05,pan:pan(),rev:0.5});
+                       if (R()<0.04) blip(60+R()*80,t,{v:0.08,d:0.3,type:'sine',glide:0.5,rev:0.6}); break;
+      case 'pic':      if (R()<0.25) blip(pent(7+((R()*8)|0)),t,{v:0.045,d:0.07,type:'sine',pan:pan(),rev:0.5,echo:0.3}); break;
+      case 'terrain':  if (R()<0.5)  blip(pent(8+((R()*8)|0)),t,{v:0.035,d:0.045,type:'square',pan:pan(),rev:0.3,echo:0.25}); break;
+      case 'semantic': if (R()<0.09) bell(pent(5+((R()*6)|0)),t,{v:0.05,d:2.4,pan:pan(),rev:0.8,echo:0.3}); break;
+      case 'implode':  if (R()<0.45) noiseBurst(t,0.04+R()*0.08,{type:'bandpass',f:1000+R()*6000,q:3,v:0.06,pan:pan(),rev:0.4}); break;
+      case 'cursor':   if (++beat%16===0) bell(pent(14),t,{v:0.025,d:3,idx:0.3,rev:0.9,echo:0.4}); break;
+    }
+  }
+
+  /* ---- 对外接口 ---- */
+  function phase(p,Tk){                 // 每进入一个新场景调用一次：换底色 + 一段入场音效
+    last={p,Tk};
+    if (!ready()) return;
+    const key=p.sfx || (p.arcs?'attn':p.layout), m=MOODS[key]||MOODS.tokens, t=now()+0.04;
+    pad(m.f,m.lv,m.cut); mode=key; beat=0;
+    switch (key){
+      case 'eye':                       // 开机：上升扫频 + 一串五声音阶的钟
+        sweepTone(180,2200,t,1.1,0.05);
+        [5,7,9,10,12].forEach((n,i)=>bell(pent(n),t+0.5+i*0.11,{v:0.07,d:1.8,pan:i*0.3-0.6}));
+        break;
+      case 'void': boom(t); whoosh(t,1.8,false,0.1); break;
+      case 'pic':                       // 图像载入：左到右扫过的细碎琶音
+        for (let i=0;i<22;i++) blip(pent(5+(i%10)),t+0.1+i*0.045,{v:0.05,d:0.06,type:'sine',pan:(i/21)*1.6-0.8,rev:0.4,echo:0.3});
+        break;
+      case 'terrain':                   // 画面变成数字：一阵数据雨，最后“锁定”
+        boom(t,0.2);
+        for (let i=0;i<26;i++) blip(pent(6+((R()*10)|0)),t+0.05+i*0.05,{v:0.04,d:0.05,type:'square',pan:R()*1.6-0.8,rev:0.3,echo:0.25});
+        bell(pent(14),t+1.5,{v:0.07,d:1.6});
+        break;
+      case 'tokens':                    // 每个 token 一声拨弦，音高由它的编号决定
+        if (Tk) Tk.list.forEach((tk,k)=>pluck(pent(3+(tk.id%9)),t+0.35+k*0.075,{v:0.15,d:0.55,pan:Tk.K>1?(k/(Tk.K-1))*1.4-0.7:0}));
+        break;
+      case 'semantic':                  // 八个概念依次亮起
+        [5,7,9,6,10,8,11,12].forEach((n,i)=>bell(pent(n),t+0.9+i*0.16,{v:0.08,d:2.2,pan:(i/7)*1.6-0.8,rev:0.7}));
+        whoosh(t,1.2,true,0.05);
+        break;
+      case 'attn': whoosh(t,0.9,true,0.06); break;
+      case 'end': [9,7,4].forEach((n,i)=>bell(pent(n),t+0.2+i*0.28,{v:0.08,d:2.2,pan:i*0.4-0.4})); break;
+      case 'implode':                   // 一切塌缩：下行扫频 + 故障碎片 + 低频重击
+        sweepTone(900,40,t,2.6,0.12); whoosh(t,2.4,false,0.14);
+        [0.2,0.6,1.1,1.5,2.2].forEach(d=>zap(t+d)); boom(t+2.4,0.5);
+        break;
+      case 'cursor': bell(pent(12),t+0.3,{v:0.03,d:4,idx:0.4,rev:0.9,echo:0.3}); break;
+    }
+  }
+  const transition=()=>{ if(!ready()) return; const t=now()+0.01; whoosh(t,0.6,true,0.07); blip(pent(12),t+0.35,{v:0.05,d:0.08,type:'sine'}); };
+  function attn(k,K){                   // 注意力光点每走一步一声拨弦，从左到右音高起伏
+    if (!ready() || mode!=='attn') return;
+    const t=now()+0.01, pan=K>1?(k/(K-1))*1.2-0.6:0;
+    pluck(pent(5+(k%7)),t,{v:0.15,d:0.7,pan,rev:0.45,echo:0.35});
+    pluck(pent((k%5)-5),t,{v:0.1,d:0.5,pan,rev:0.3,echo:0});
+  }
+  const pick=()=>{ if(!ready()||mode!=='attn') return; const t=now()+0.14; bell(pent(12+((R()*3)|0)),t,{v:0.08,d:0.9,pan:0.3}); };
+  const glitch=()=>{ if(ready()) zap(now()+0.005); };
+  const whisper=()=>{ if(!ready()||paused) return; bell(pent(10+((R()*4)|0)),now()+0.01,{v:0.035,d:1.0,pan:R()*1.6-0.8,rev:0.9,echo:0.4}); };
+  const hover=()=>{ if(ready()) blip(2093,now(),{v:0.035,d:0.05,type:'sine',glide:1.2,rev:0.3,echo:0}); };
+  const focus=()=>{ if(ready()) bell(pent(12),now(),{v:0.06,d:0.5}); };
+  const key=()=>{ if(ready()) blip(pent(9+((R()*5)|0)),now(),{v:0.03,d:0.04,type:'triangle',glide:1.1,rev:0.25,echo:0.1}); };
+  const send=()=>{ if(!ready()) return; const t=now()+0.01; for (let i=0;i<6;i++) pluck(pent(5+i),t+i*0.06,{v:0.12,d:0.5,pan:i*0.2-0.5}); };
+  function setPaused(b){
+    paused=b; if (!ready()) return;
+    const t=now(); padFilter.frequency.setTargetAtTime(b?320:padCut,t,0.25); master.gain.setTargetAtTime(b?level(vol)*0.55:level(vol),t,0.25);
+    blip(b?pent(5):pent(9),t+0.01,{v:0.07,d:0.12,type:'sine',glide:b?1.5:0.65});
+  }
+
+  function setVolume(v){
+    vol=Math.min(1,Math.max(0,v));
+    try { localStorage.setItem('sfxvol',String(vol)); } catch(e) {}
+    if (ctx && on) master.gain.setTargetAtTime(paused?level(vol)*0.55:level(vol),ctx.currentTime,0.06);
+    volListeners.forEach(f=>f(vol));
+    const t=performance.now();            // 拖动时给一声随音量升高的“滴”，方便凭耳朵找音量
+    if (ready() && vol>0 && t-lastTick>70){ lastTick=t; blip(pent(3+Math.round(vol*9)),now()+0.005,{v:0.07,d:0.06,type:'sine',glide:1.1,rev:0.2,echo:0}); }
+  }
+
+  /* ---- 开关 / 解锁（浏览器规定：必须有用户点击才能出声） ---- */
+  function unlock(){
+    if (!ctx){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if (!AC){ state='na'; emit(); return; }
+      attach(new AC({latencyHint:'interactive'}));
+    }
+    if (ctx.resume) ctx.resume();
+    try { const s=ctx.createBufferSource(); s.buffer=ctx.createBuffer(1,1,22050); s.connect(ctx.destination); s.start(0); } catch(e) {}   // iOS 解锁
+    on=true; state='on'; userMuted=false; try { localStorage.setItem('sfx','on'); } catch(e) {}
+    master.gain.setTargetAtTime(paused?level(vol)*0.55:level(vol),ctx.currentTime,0.4);
+    emit(); if (last) phase(last.p,last.Tk);
+  }
+  function mute(){
+    on=false; state='off'; userMuted=true; try { localStorage.setItem('sfx','off'); } catch(e) {}
+    if (ctx) master.gain.setTargetAtTime(0,ctx.currentTime,0.12);
+    emit();
+  }
+  const toggle=()=>{ if (state==='on') mute(); else unlock(); };
+  ['pointerdown','pointerup','keydown','touchend'].forEach(ev => addEventListener(ev, e => {
+    if (userMuted || state==='na') return;
+    if (e.target && e.target.closest && e.target.closest('#audio')) return;
+    if (!ctx) unlock(); else if (ctx.state==='suspended' && on) ctx.resume();
+  }, true));
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx || !live) return;
+    if (document.hidden) ctx.suspend(); else if (on) ctx.resume();
+  });
+
+  return { get state(){ return state; }, get volume(){ return vol; }, DEFAULT_VOL, onstate:f=>listeners.push(f), onvolume:f=>volListeners.push(f), setVolume, unlock, toggle, attach, phase, transition, attn, pick, glitch, whisper, hover, focus, key, send, setPaused };
+})();
 
 /* ============================== 状态 / HUD ============================== */
 const capEl=document.getElementById('cap'), h1=capEl.querySelector('h1'), pEl=capEl.querySelector('p');
 const tagN=document.getElementById('tagN'), tagName=document.getElementById('tagName'), barI=document.querySelector('#bar i');
 const dotsEl=document.getElementById('dots'), probsEl=document.getElementById('probs'), rowsEl=document.getElementById('rows');
-const dotBtns = CH.map((c,i) => { const b=document.createElement('button'); b.textContent=String(i+1).padStart(2,'0')+' '+c.name; b.onclick=()=>enter(i); dotsEl.appendChild(b); return b; });
+const dotBtns = CH.map((c,i) => { const b=document.createElement('button'); b.textContent=String(i+1).padStart(2,'0')+' '+c.name; b.onclick=()=>enter(i); b.onpointerenter=e=>{ if (e.pointerType==='mouse') SFX.hover(); }; dotsEl.appendChild(b); return b; });
 
 let ch=0, chT=0, phase=-1, paused=false, curPhase=null, speedMul=1, alphaT=1, camAngle=0, tokCur=0, lastTokCur=-1;
 let capTimer=null;
@@ -480,8 +793,10 @@ function applyPhase(p){
   speedMul = p.speed||1;
   alphaT = p.alpha ?? 1;
   if (p.glitch) fireGlitch();
+  SFX.phase(p,T);
 }
 function enter(i){
+  SFX.transition();
   ch=((i%CH.length)+CH.length)%CH.length; chT=0; phase=-1;
   dotBtns.forEach((b,k)=>b.classList.toggle('on',k===ch));
   const ob=dotBtns[ch]; dotsEl.scrollTo({ left: ob.offsetLeft-(dotsEl.clientWidth-ob.offsetWidth)/2, behavior:'smooth' });
@@ -502,6 +817,7 @@ function refreshProbs(){
   const sum=ws.reduce((a,b)=>a+b,0)/0.93; ws=ws.map(w=>w/sum);
   let r=Math.random()*0.93, chosen=0; for (let i=0;i<ws.length;i++){ r-=ws[i]; if (r<=0){ chosen=i; break; } }
   rowsEl.innerHTML = pick.map((w,i)=>`<div class="row${i===chosen?' pick':''}"><span class="w">${w}</span><span class="b"><i style="width:${(ws[i]*100/ws[0]).toFixed(0)}%"></i></span><span class="p">${(ws[i]*100).toFixed(1)}%</span></div>`).join('');
+  SFX.pick();
 }
 
 /* ============================== 低语 / 故障 ============================== */
@@ -510,19 +826,20 @@ function whisper(){
   const d=document.createElement('div'); d.className='whisper'; d.textContent=WH[Math.floor(Math.random()*WH.length)];
   d.style.left=(5+Math.random()*80)+'vw'; d.style.top=(8+Math.random()*80)+'vh';
   document.body.appendChild(d); setTimeout(()=>d.remove(),1300);
+  SFX.whisper();
   setTimeout(whisper, 1200+Math.random()*2800);
 }
 const glitchEl=document.getElementById('glitch');
-function fireGlitch(){ glitchEl.classList.remove('on'); void glitchEl.offsetWidth; glitchEl.classList.add('on'); }
+function fireGlitch(){ glitchEl.classList.remove('on'); void glitchEl.offsetWidth; glitchEl.classList.add('on'); SFX.glitch(); }
 
 /* ============================== 交互 ============================== */
 const mouse={x:0,y:0};
 addEventListener('pointermove', e => { mouse.x=e.clientX/innerWidth*2-1; mouse.y=e.clientY/innerHeight*2-1; });
 addEventListener('keydown', e => {
-  if (e.target.tagName==='INPUT') return;
+  if (e.target.tagName==='INPUT' || e.target.id==='vol') return;
   if (e.key==='ArrowRight') enter(ch+1);
   else if (e.key==='ArrowLeft') enter(ch-1);
-  else if (e.key===' '){ paused=!paused; e.preventDefault(); }
+  else if (e.key===' '){ paused=!paused; SFX.setPaused(paused); e.preventDefault(); }
 });
 // 触屏：左右滑动切换章节（横向位移明显大于纵向才算）
 let swipe=null;
@@ -535,8 +852,53 @@ canvas.addEventListener('touchend', e => {
 document.getElementById('prompt').addEventListener('submit', e => {
   e.preventDefault();
   const inp=document.getElementById('inp');
-  if (setTokens(inp.value)){ inp.value=''; inp.blur(); paused=false; enter(2); }
+  if (setTokens(inp.value)){ inp.value=''; inp.blur(); paused=false; SFX.setPaused(false); SFX.send(); enter(2); }
 });
+{ const inp=document.getElementById('inp'); inp.addEventListener('focus',()=>SFX.focus()); inp.addEventListener('input',()=>SFX.key()); }
+
+// 声音开关按钮
+const sndBtn=document.getElementById('snd');
+const SND_TXT={ wait:'点击开启声音', on:'声音 开', off:'声音 关', na:'此浏览器不支持声音' };
+const sndUpdate=s=>{ sndBtn.className=s; sndBtn.lastElementChild.textContent=SND_TXT[s]; };
+SFX.onstate(sndUpdate); sndUpdate(SFX.state);
+sndBtn.addEventListener('click',()=>SFX.toggle());
+
+// 音量旋钮：拖动（往上或往右增大）、滚轮、方向键、双击复位
+const knob=document.getElementById('vol'), volTxt=document.getElementById('volTxt'), audioEl=document.getElementById('audio');
+const knobVal=knob.querySelector('.val'), knobPtr=knob.querySelector('.ptr');
+function knobPaint(v){
+  const pct=Math.round(v*100);
+  knobVal.style.strokeDasharray=`${(70.69*v).toFixed(2)} 94.25`;
+  knobPtr.setAttribute('transform',`rotate(${(-135+270*v).toFixed(1)} 20 20)`);
+  knob.setAttribute('aria-valuenow',pct); knob.setAttribute('aria-valuetext',pct+'%');
+  volTxt.textContent=pct+'%';
+}
+SFX.onvolume(knobPaint); knobPaint(SFX.volume);
+audioEl.classList.toggle('dim', SFX.state==='off');
+SFX.onstate(s=>audioEl.classList.toggle('dim', s==='off'));
+const knobSet=v=>{ SFX.setVolume(v); if (v>0 && SFX.state!=='on' && SFX.state!=='na') SFX.unlock(); };
+let kd=null;
+knob.addEventListener('pointerdown', e => {
+  e.preventDefault(); knob.focus({preventScroll:true}); knob.setPointerCapture(e.pointerId);
+  kd={ id:e.pointerId, x:e.clientX, y:e.clientY, v:SFX.volume }; knob.classList.add('drag');
+});
+knob.addEventListener('pointermove', e => {
+  if (!kd || e.pointerId!==kd.id) return;
+  const d=(kd.y-e.clientY)+(e.clientX-kd.x);
+  knobSet(kd.v + d/160);
+});
+const knobEnd = e => { if (kd && e.pointerId===kd.id){ kd=null; knob.classList.remove('drag'); } };
+knob.addEventListener('pointerup', knobEnd); knob.addEventListener('pointercancel', knobEnd);
+knob.addEventListener('wheel', e => { e.preventDefault(); knobSet(SFX.volume + (e.deltaY<0?0.05:-0.05)); }, {passive:false});
+knob.addEventListener('dblclick', () => knobSet(SFX.DEFAULT_VOL));
+knob.addEventListener('keydown', e => {
+  const step=e.shiftKey?0.1:0.05; let v=null;
+  if (e.key==='ArrowUp'||e.key==='ArrowRight') v=SFX.volume+step;
+  else if (e.key==='ArrowDown'||e.key==='ArrowLeft') v=SFX.volume-step;
+  else if (e.key==='Home') v=0; else if (e.key==='End') v=1; else if (e.key==='PageUp') v=SFX.volume+0.2; else if (e.key==='PageDown') v=SFX.volume-0.2;
+  if (v!==null){ e.preventDefault(); e.stopPropagation(); knobSet(v); }
+});
+window.SFX=SFX;
 function resize(){
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
@@ -588,7 +950,7 @@ function frame(){
     if (arcs.material.opacity>0.01){
       tokCur = ch===4 ? (Math.floor(chT*1.25)%Math.max(1,T.K-1))+1 : 0;
       updateArcs(time,tokCur);
-      if (tokCur!==lastTokCur){ lastTokCur=tokCur; if (curPhase&&curPhase.probs) refreshProbs(); }
+      if (tokCur!==lastTokCur){ lastTokCur=tokCur; SFX.attn(tokCur,T.K); if (curPhase&&curPhase.probs) refreshProbs(); }
     }
   }
   glowX += (tokenX(tokCur)-glowX)*Math.min(1,dt*9);
@@ -605,7 +967,7 @@ function frame(){
 setTokens('你好，你看见的世界和我看见的一样吗？');
 // 先把点云直接铺到初始版面，避免开场从原点炸开
 L.void(); cur.set(tPos); curCol.set(tCol); curSize.set(tSize);
-enter(parseInt(location.hash.slice(1),10)-1 || 0);   // 例如 world.html#3 直接从第 3 幕开始
+enter(parseInt(location.hash.slice(1),10)-1 || 0);   // 例如 index.html#3 直接从第 3 幕开始
 setTimeout(whisper, 2500);
 requestAnimationFrame(frame);
 })();
