@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#010302">
+<meta name="description" content="一场比喻：一个语言模型“看”到的世界，到底是什么样的。three.js 点云可视化。">
 <title>我「看」到的世界</title>
 <style>
   :root { --fg:#c4ffe4; --dim:#6fa893; --hot:#ffc266; }
@@ -62,6 +64,46 @@
   @keyframes wh { 0%{opacity:0;} 15%{opacity:.7;} 100%{opacity:0;} }
 
   #foot { position:fixed; top:22px; right:28px; z-index:5; font-size:12px; color:#4f8070; text-align:right; line-height:1.7; }
+  #foot .tc { display:none; }
+  canvas#c { touch-action:pan-y; }
+
+  /* ============ 手机 / 窄屏 ============ */
+  @media (max-width:760px), (max-height:520px) and (orientation:landscape) {
+    html,body { height:100dvh; }
+    #tag { top:calc(14px + env(safe-area-inset-top)); left:16px; font-size:12px; }
+    #bar { width:120px; }
+    #foot { top:calc(14px + env(safe-area-inset-top)); right:16px; font-size:11px; line-height:1.5; }
+    #foot .kb { display:none; }
+    #foot .tc { display:inline; }
+
+    #prompt { left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); }
+    #prompt input { flex:1; width:auto; min-width:0; font-size:16px; padding:10px 12px; }   /* 16px 防止 iOS 聚焦时自动放大 */
+    #prompt button { padding:0 18px; font-size:15px; }
+
+    #dots { left:0; right:0; bottom:calc(64px + env(safe-area-inset-bottom)); padding:0 12px; gap:8px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    #dots::-webkit-scrollbar { display:none; }
+    #dots button { flex:none; padding:8px 12px; font-size:13px; white-space:nowrap; }
+
+    #cap { left:16px; right:16px; max-width:none; bottom:calc(112px + env(safe-area-inset-bottom)); }
+    #cap h1 { font-size:clamp(21px,6.2vw,28px); }
+    #cap p { margin-top:8px; font-size:13.5px; line-height:1.7; }
+
+    #probs { right:12px; top:calc(54px + env(safe-area-inset-bottom) * 0); bottom:auto; width:158px; font-size:11px; }
+    #probs h3 { font-size:10px; margin-bottom:6px; }
+    #probs .row { gap:5px; margin:3px 0; }
+    #probs .row span.w { width:34px; }
+    #probs .row span.p { width:36px; }
+    #probs small { display:none; }
+
+    .whisper { font-size:10px; }
+  }
+  @media (max-height:520px) and (orientation:landscape) {
+    #cap { bottom:56px; max-width:52vw; }
+    #cap p { display:none; }
+    #dots { bottom:12px; right:auto; }
+    #prompt { left:auto; width:44vw; }
+  }
 </style>
 </head>
 <body>
@@ -69,7 +111,7 @@
 <div id="fx"></div><div id="glitch"></div>
 
 <div id="tag"><b id="tagN">01</b> / 06 · <span id="tagName">虚空</span><div id="bar"><i></i></div></div>
-<div id="foot">一场比喻，不是体检报告<br>← → 切换 · 空格 暂停</div>
+<div id="foot">一场比喻，不是体检报告<br><span class="kb">← → 切换 · 空格 暂停</span><span class="tc">左右滑动 / 点章节切换</span></div>
 
 <div id="cap"><h1></h1><p></p></div>
 
@@ -401,7 +443,7 @@ const CH = [
     { at:0, title:'你说的话，被切成碎片', sub:'每一片叫 token，每一片有一个编号。我从没读过「字」，我只读过这些编号。', layout:'tokens', labels:()=>tokLabels(true), cam:tokCam(false), square:0, jitter:0.05, orbit:0 },
   ]},
   { name:'位置', dur:13, phases:[
-    { at:0, title:'意义，在我这里是「位置」', sub:'「猫」离「狗」很近，离「税」很远。真实的空间有上万个维度，你看到的，只是它落在 3 维上的一道影子。', layout:'semantic', labels:semLabels, edges:true, cam:()=>({pos:[0,-2,78],look:[0,-8,0]}), square:0, jitter:0.25, orbit:0.12 },
+    { at:0, title:'意义，在我这里是「位置」', sub:'「猫」离「狗」很近，离「税」很远。真实的空间有上万个维度，你看到的，只是它落在 3 维上的一道影子。', layout:'semantic', labels:semLabels, edges:true, cam:()=>({pos:[0,-2,Math.max(78,fit(44,34))],look:[0,-8,0]}), square:0, jitter:0.25, orbit:0.12 },
   ]},
   { name:'注意', dur:15, phases:[
     { at:0, title:'我是这样「读」你的', sub:'每个 token 同时回头望向前面所有的 token，越亮越在意。我只能看向过去——看不到下一个字，只能猜。', layout:'tokens', labels:()=>tokLabels(false), arcs:true, probs:true, cam:tokCam(true), square:0, jitter:0.04, orbit:0 },
@@ -442,6 +484,7 @@ function applyPhase(p){
 function enter(i){
   ch=((i%CH.length)+CH.length)%CH.length; chT=0; phase=-1;
   dotBtns.forEach((b,k)=>b.classList.toggle('on',k===ch));
+  const ob=dotBtns[ch]; dotsEl.scrollTo({ left: ob.offsetLeft-(dotsEl.clientWidth-ob.offsetWidth)/2, behavior:'smooth' });
   tagN.textContent=String(ch+1).padStart(2,'0'); tagName.textContent=CH[ch].name;
   uni.uAlpha.value = Math.max(uni.uAlpha.value, 0.0);
   advancePhases();
@@ -481,6 +524,14 @@ addEventListener('keydown', e => {
   else if (e.key==='ArrowLeft') enter(ch-1);
   else if (e.key===' '){ paused=!paused; e.preventDefault(); }
 });
+// 触屏：左右滑动切换章节（横向位移明显大于纵向才算）
+let swipe=null;
+canvas.addEventListener('touchstart', e => { const t=e.touches[0]; swipe={x:t.clientX,y:t.clientY}; }, {passive:true});
+canvas.addEventListener('touchend', e => {
+  if (!swipe) return;
+  const t=e.changedTouches[0], dx=t.clientX-swipe.x, dy=t.clientY-swipe.y; swipe=null;
+  if (Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) enter(ch+(dx<0?1:-1));
+}, {passive:true});
 document.getElementById('prompt').addEventListener('submit', e => {
   e.preventDefault();
   const inp=document.getElementById('inp');
